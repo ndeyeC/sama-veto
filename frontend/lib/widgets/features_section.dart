@@ -12,6 +12,7 @@ class FeaturesSection extends StatelessWidget {
       title: 'Gestion des animaux',
       description:
           'Enregistrez vos animaux et gardez leurs informations utiles à portée de main.',
+      route: '/animals',
     ),
     _Feature(
       icon: Icons.health_and_safety_rounded,
@@ -103,12 +104,14 @@ class _Feature {
     required this.color,
     required this.title,
     required this.description,
+    this.route,
   });
 
   final IconData icon;
   final Color color;
   final String title;
   final String description;
+  final String? route;
 }
 
 class _FeatureCard extends StatelessWidget {
@@ -118,6 +121,20 @@ class _FeatureCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final route = feature.route;
+    final card = _buildCard();
+    if (route == null) return card;
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(20),
+        onTap: () => Navigator.of(context).pushNamed(route),
+        child: card,
+      ),
+    );
+  }
+
+  Widget _buildCard() {
     return Container(
       constraints: const BoxConstraints(minHeight: 208),
       padding: const EdgeInsets.all(23),

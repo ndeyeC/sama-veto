@@ -7,4 +7,9 @@ class ApiConstants {
   static const String login = '/login';
   static const String logout = '/logout';
   static const String profile = '/user';
+
+  // Gestion des animaux
+  static const String animals = '/animals';
+  static const String animalsStats = '/animals/stats';
+  static const String devToken = '/dev/token'; // TEMPORAIRE (dev)
 }
