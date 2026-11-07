@@ -4,8 +4,9 @@ import '../../constants/app_colors.dart';
 import '../../models/animal.dart';
 import '../../services/animal_service.dart';
 
-/// Formulaire d'ajout (animal == null) ou de modification d'un animal.
-/// Renvoie `true` à l'écran précédent si l'enregistrement a réussi.
+/// Formulaire d'ajout (animal == null) ou de modification (cahier des charges §3.3) :
+/// grille des 8 espèces, nom, race, sexe, mois et année de naissance.
+/// Renvoie l'animal enregistré à l'écran précédent (ou null si annulé).
 class AnimalFormPage extends StatefulWidget {
   const AnimalFormPage({this.animal, super.key});
 
@@ -28,9 +29,11 @@ class _AnimalFormPageState extends State<AnimalFormPage> {
 
   late String? _espece = widget.animal?.espece;
   late String? _sexe = widget.animal?.sexe;
-  late DateTime? _dateNaissance = widget.animal?.dateNaissance;
+  late int? _moisNaissance = widget.animal?.dateNaissance?.month;
+  late int? _anneeNaissance = widget.animal?.dateNaissance?.year;
 
   bool _envoi = false;
+  bool _especeManquante = false;
   ApiException? _erreurApi;
 
   bool get _modification => widget.animal != null;
@@ -45,20 +48,17 @@ class _AnimalFormPageState extends State<AnimalFormPage> {
 
   String? _texte(TextEditingController c) => c.text.trim().isEmpty ? null : c.text.trim();
 
-  Future<void> _choisirDate() async {
-    final d = await showDatePicker(
-      context: context,
-      initialDate: _dateNaissance ?? DateTime.now(),
-      firstDate: DateTime(1990),
-      lastDate: DateTime.now(),
-      helpText: 'Date de naissance',
-    );
-    if (d != null) setState(() => _dateNaissance = d);
-  }
+  /// Date envoyée à l'API : le 1er du mois choisi (ou janvier si seul l'an est choisi).
+  DateTime? get _dateNaissance =>
+      _anneeNaissance == null ? null : DateTime(_anneeNaissance!, _moisNaissance ?? 1, 1);
 
   Future<void> _enregistrer() async {
-    setState(() => _erreurApi = null);
-    if (!_formKey.currentState!.validate()) return;
+    setState(() {
+      _erreurApi = null;
+      _especeManquante = _espece == null;
+    });
+    final formOk = _formKey.currentState!.validate();
+    if (!formOk || _especeManquante) return;
 
     final animal = Animal(
       nom: _nom.text.trim(),
@@ -74,19 +74,14 @@ class _AnimalFormPageState extends State<AnimalFormPage> {
 
     setState(() => _envoi = true);
     try {
-      if (_modification) {
-        await _service.modifier(widget.animal!.id!, animal);
-      } else {
-        await _service.creer(animal);
-      }
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(_modification ? 'Animal modifié.' : 'Animal enregistré.')),
-      );
-      Navigator.of(context).pop(true);
+      final enregistre = _modification
+          ? await _service.modifier(widget.animal!.id!, animal)
+          : await _service.creer(animal); // hors ligne : gardé sur l'appareil
+      if (mounted) Navigator.of(context).pop(enregistre);
     } on ApiException catch (e) {
-      setState(() => _erreurApi = e);
-      _formKey.currentState!.validate(); // affiche les erreurs renvoyées par Laravel
+      setState(() => _erreurApi = e.horsLigne
+          ? ApiException(0, 'Connexion nécessaire pour modifier un animal.')
+          : e);
     } finally {
       if (mounted) setState(() => _envoi = false);
     }
@@ -106,8 +101,10 @@ class _AnimalFormPageState extends State<AnimalFormPage> {
   @override
   Widget build(BuildContext context) {
     const espace = SizedBox(height: 14);
+    final anneeCourante = DateTime.now().year;
+
     return Scaffold(
-      appBar: AppBar(title: Text(_modification ? 'Modifier ${widget.animal!.nom}' : 'Nouvel animal')),
+      appBar: AppBar(title: Text(_modification ? 'Modifier ${widget.animal!.nom}' : 'Ajouter un animal')),
       body: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 640),
@@ -119,88 +116,102 @@ class _AnimalFormPageState extends State<AnimalFormPage> {
                 if (_erreurApi != null && _erreurApi!.errors.isEmpty)
                   Padding(
                     padding: const EdgeInsets.only(bottom: 14),
-                    child: Text(_erreurApi!.message, style: TextStyle(color: Colors.red.shade700)),
+                    child: Text(_erreurApi!.message, style: const TextStyle(color: Color(0xFFC62828))),
                   ),
+                const Text('Espèce *', style: TextStyle(fontWeight: FontWeight.w700, color: AppColors.darkGreen)),
+                const SizedBox(height: 8),
+                _grilleEspeces(),
+                if (_especeManquante || _erreurApi?.erreurChamp('espece') != null)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 6),
+                    child: Text(
+                      _erreurApi?.erreurChamp('espece') ?? 'Choisissez une espèce',
+                      style: const TextStyle(color: Color(0xFFC62828), fontSize: 12),
+                    ),
+                  ),
+                const SizedBox(height: 20),
                 TextFormField(
                   controller: _nom,
-                  decoration: _deco('Nom *', champApi: 'nom'),
+                  decoration: _deco('Nom de l’animal *', champApi: 'nom'),
                   textCapitalization: TextCapitalization.words,
                   validator: (v) => (v == null || v.trim().isEmpty) ? 'Le nom est obligatoire' : null,
                 ),
                 espace,
+                TextFormField(controller: _race, decoration: _deco('Race (optionnel)', champApi: 'race')),
+                espace,
                 DropdownButtonFormField<String>(
-                  value: _espece,
-                  decoration: _deco('Espèce *', champApi: 'espece'),
+                  value: _sexe,
+                  decoration: _deco('Sexe *', champApi: 'sexe'),
                   items: [
-                    for (final e in Animal.especes.entries)
-                      DropdownMenuItem(value: e.key, child: Text(e.value)),
+                    for (final s in Animal.sexes.entries) DropdownMenuItem(value: s.key, child: Text(s.value)),
                   ],
-                  onChanged: (v) => setState(() => _espece = v),
-                  validator: (v) => v == null ? 'Choisissez une espèce' : null,
+                  onChanged: (v) => setState(() => _sexe = v),
+                  validator: (v) => v == null ? 'Choisissez le sexe' : null,
                 ),
                 espace,
-                TextFormField(controller: _race, decoration: _deco('Race', champApi: 'race')),
-                espace,
-                FormField<String>(
-                  initialValue: _sexe,
-                  validator: (_) => _sexe == null ? 'Choisissez le sexe' : null,
-                  builder: (state) => InputDecorator(
-                    decoration: _deco('Sexe *', champApi: 'sexe').copyWith(errorText: state.errorText),
-                    child: SegmentedButton<String>(
-                      emptySelectionAllowed: true,
-                      segments: [
-                        for (final s in Animal.sexes.entries)
-                          ButtonSegment(value: s.key, label: Text(s.value)),
-                      ],
-                      selected: {if (_sexe != null) _sexe!},
-                      onSelectionChanged: (sel) {
-                        setState(() => _sexe = sel.isEmpty ? null : sel.first);
-                        state.didChange(_sexe);
+                Row(
+                  children: [
+                    Expanded(
+                      child: DropdownButtonFormField<int>(
+                        value: _moisNaissance,
+                        decoration: _deco('Mois de naissance'),
+                        items: [
+                          for (var m = 1; m <= 12; m++)
+                            DropdownMenuItem(value: m, child: Text(Animal.mois[m - 1])),
+                        ],
+                        onChanged: (v) => setState(() => _moisNaissance = v),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: DropdownButtonFormField<int>(
+                        value: _anneeNaissance,
+                        decoration: _deco('Année', champApi: 'date_naissance'),
+                        items: [
+                          for (var y = anneeCourante; y >= anneeCourante - 30; y--)
+                            DropdownMenuItem(value: y, child: Text('$y')),
+                        ],
+                        onChanged: (v) => setState(() => _anneeNaissance = v),
+                        validator: (_) {
+                          if (_moisNaissance != null && _anneeNaissance == null) return 'Choisissez l’année';
+                          final d = _dateNaissance;
+                          if (d != null && d.isAfter(DateTime.now())) return 'Date dans le futur';
+                          return null;
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                ExpansionTile(
+                  tilePadding: EdgeInsets.zero,
+                  title: const Text('Informations complémentaires (optionnel)'),
+                  initiallyExpanded: _modification &&
+                      (widget.animal!.poids != null ||
+                          widget.animal!.numeroIdentification != null ||
+                          widget.animal!.notes != null),
+                  children: [
+                    const SizedBox(height: 6),
+                    TextFormField(
+                      controller: _poids,
+                      decoration: _deco('Poids', champApi: 'poids', suffix: 'kg'),
+                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                      validator: (v) {
+                        if (v == null || v.trim().isEmpty) return null;
+                        final n = double.tryParse(v.trim().replaceAll(',', '.'));
+                        return (n == null || n < 0) ? 'Poids invalide' : null;
                       },
                     ),
-                  ),
-                ),
-                espace,
-                InkWell(
-                  onTap: _choisirDate,
-                  borderRadius: BorderRadius.circular(12),
-                  child: InputDecorator(
-                    decoration: _deco('Date de naissance', champApi: 'date_naissance').copyWith(
-                      suffixIcon: _dateNaissance != null
-                          ? IconButton(
-                              icon: const Icon(Icons.clear),
-                              onPressed: () => setState(() => _dateNaissance = null),
-                            )
-                          : const Icon(Icons.calendar_today_outlined),
+                    espace,
+                    TextFormField(controller: _couleur, decoration: _deco('Couleur / robe', champApi: 'couleur')),
+                    espace,
+                    TextFormField(
+                      controller: _numero,
+                      decoration: _deco('N° d’identification (boucle, puce…)', champApi: 'numero_identification'),
                     ),
-                    child: Text(
-                      _dateNaissance != null ? Animal.formatDateFr(_dateNaissance!) : 'Non renseignée',
-                    ),
-                  ),
-                ),
-                espace,
-                TextFormField(
-                  controller: _poids,
-                  decoration: _deco('Poids', champApi: 'poids', suffix: 'kg'),
-                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                  validator: (v) {
-                    if (v == null || v.trim().isEmpty) return null;
-                    final n = double.tryParse(v.trim().replaceAll(',', '.'));
-                    return (n == null || n < 0) ? 'Poids invalide' : null;
-                  },
-                ),
-                espace,
-                TextFormField(controller: _couleur, decoration: _deco('Couleur / robe', champApi: 'couleur')),
-                espace,
-                TextFormField(
-                  controller: _numero,
-                  decoration: _deco('N° d’identification (boucle, puce…)', champApi: 'numero_identification'),
-                ),
-                espace,
-                TextFormField(
-                  controller: _notes,
-                  decoration: _deco('Notes', champApi: 'notes'),
-                  maxLines: 3,
+                    espace,
+                    TextFormField(controller: _notes, decoration: _deco('Notes', champApi: 'notes'), maxLines: 3),
+                  ],
                 ),
                 const SizedBox(height: 24),
                 FilledButton(
@@ -211,10 +222,84 @@ class _AnimalFormPageState extends State<AnimalFormPage> {
                           width: 20,
                           child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.white),
                         )
-                      : Text(_modification ? 'Enregistrer les modifications' : 'Ajouter l’animal'),
+                      : const Text('Enregistrer →'),
                 ),
               ],
             ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// Grille de 8 icônes cliquables (4 colonnes).
+  Widget _grilleEspeces() {
+    return GridView.count(
+      crossAxisCount: 4,
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      mainAxisSpacing: 10,
+      crossAxisSpacing: 10,
+      childAspectRatio: 1.05,
+      children: [
+        for (final e in Animal.especes.entries)
+          _CaseEspece(
+            emoji: e.value.$1,
+            label: e.value.$2,
+            selectionnee: _espece == e.key,
+            onTap: () => setState(() {
+              _espece = e.key;
+              _especeManquante = false;
+            }),
+          ),
+      ],
+    );
+  }
+}
+
+class _CaseEspece extends StatelessWidget {
+  const _CaseEspece({
+    required this.emoji,
+    required this.label,
+    required this.selectionnee,
+    required this.onTap,
+  });
+
+  final String emoji;
+  final String label;
+  final bool selectionnee;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: selectionnee ? AppColors.lightGreen : AppColors.white,
+      borderRadius: BorderRadius.circular(14),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(14),
+        onTap: onTap,
+        child: Container(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(
+              color: selectionnee ? AppColors.green : AppColors.border,
+              width: selectionnee ? 2 : 1,
+            ),
+          ),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Text(emoji, style: const TextStyle(fontSize: 30)),
+              const SizedBox(height: 4),
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: selectionnee ? FontWeight.w800 : FontWeight.w500,
+                  color: AppColors.darkGreen,
+                ),
+              ),
+            ],
           ),
         ),
       ),

@@ -26,7 +26,7 @@ class AnimalRequest extends FormRequest
             'espece' => [$required, Rule::in(Animal::ESPECES)],
             'race' => ['nullable', 'string', 'max:100'],
             'sexe' => [$required, Rule::in(Animal::SEXES)],
-            'date_naissance' => ['nullable', 'date', 'before_or_equal:today'],
+            'date_naissance' => ['nullable', 'date', 'before_or_equal:today'], // l'appli envoie le 1er du mois choisi
             'poids' => ['nullable', 'numeric', 'min:0', 'max:5000'],
             'couleur' => ['nullable', 'string', 'max:50'],
             'numero_identification' => [

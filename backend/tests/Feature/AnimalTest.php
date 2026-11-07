@@ -108,4 +108,60 @@ class AnimalTest extends TestCase
             ->assertJsonPath('data.total', 3)
             ->assertJsonPath('data.par_espece.bovin', 2);
     }
+
+    public function test_enregistrement_initial_et_calendrier_generes(): void
+    {
+        Sanctum::actingAs(User::factory()->create());
+
+        $res = $this->postJson('/api/animals', ['nom' => 'Pinto', 'espece' => 'volaille', 'sexe' => 'femelle'])
+            ->assertCreated()
+            ->assertJsonPath('data.statut_sante', 'bientot') // Newcastle dans 7 jours
+            ->assertJsonPath('data.couverture', 100);
+
+        $events = collect($res->json('data.health_events'));
+        $this->assertTrue($events->contains(fn ($e) => $e['acte'] === 'Enregistrement initial' && $e['statut'] === 'fait'));
+        $this->assertCount(1 + count(config('vaccins.volaille')), $events);
+    }
+
+    public function test_statut_urgent_couverture_et_marquer_fait(): void
+    {
+        $moi = User::factory()->create();
+        $animal = Animal::factory()->create(['user_id' => $moi->id, 'espece' => 'bovin']);
+        Sanctum::actingAs($moi);
+
+        $res = $this->postJson("/api/animals/{$animal->id}/events", [
+            'acte' => 'Vaccin oublié', 'type' => 'vaccin', 'date_prevue' => today()->subDays(3)->toDateString(),
+        ])->assertCreated()
+            ->assertJsonPath('animal.statut_sante', 'urgent')
+            ->assertJsonPath('animal.couverture', 50); // 1 fait (enregistrement) sur 2 dus
+
+        $this->getJson('/api/animals/stats')->assertJsonPath('data.urgences', 1);
+
+        $eventId = $res->json('data.id');
+        $this->patchJson("/api/animals/{$animal->id}/events/{$eventId}/fait")
+            ->assertOk()
+            ->assertJsonPath('animal.statut_sante', 'a_jour')
+            ->assertJsonPath('animal.couverture', 100);
+    }
+
+    public function test_pas_d_acte_sur_l_animal_d_un_autre(): void
+    {
+        $autre = Animal::factory()->create();
+        Sanctum::actingAs(User::factory()->create());
+
+        $this->postJson("/api/animals/{$autre->id}/events", [
+            'acte' => 'X', 'type' => 'vaccin', 'date_prevue' => today()->toDateString(),
+        ])->assertNotFound();
+    }
+
+    public function test_les_8_especes_du_cahier_des_charges(): void
+    {
+        Sanctum::actingAs(User::factory()->create());
+
+        foreach (['bovin', 'ovin', 'caprin', 'canin', 'volaille', 'equin', 'felin', 'porcin'] as $espece) {
+            $this->postJson('/api/animals', ['nom' => $espece, 'espece' => $espece, 'sexe' => 'male'])->assertCreated();
+        }
+        $this->postJson('/api/animals', ['nom' => 'X', 'espece' => 'chien', 'sexe' => 'male'])
+            ->assertJsonValidationErrors('espece');
+    }
 }

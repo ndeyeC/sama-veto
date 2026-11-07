@@ -26,6 +26,8 @@ Route::get('/user', function (Request $request) {
 Route::middleware('auth:sanctum')->group(function () {
     Route::get('/animals/stats', [AnimalController::class, 'stats']);
     Route::apiResource('animals', AnimalController::class);
+    Route::post('/animals/{animal}/events', [AnimalController::class, 'ajouterEvenement']);
+    Route::patch('/animals/{animal}/events/{event}/fait', [AnimalController::class, 'marquerFait']);
 });
 
 /*
