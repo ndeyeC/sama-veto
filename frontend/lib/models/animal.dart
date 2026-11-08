@@ -178,10 +178,10 @@ class Animal {
 
   /// Format attendu par l'API : AAAA-MM-JJ.
   static String formatDateApi(DateTime d) =>
-      '${d.year.toString().padLeft(4, '0')}-${_2(d.month)}-${_2(d.day)}';
+      '${d.year.toString().padLeft(4, '0')}-${_deuxChiffres(d.month)}-${_deuxChiffres(d.day)}';
 
   /// Format affiché : JJ/MM/AAAA.
-  static String formatDateFr(DateTime d) => '${_2(d.day)}/${_2(d.month)}/${d.year}';
+  static String formatDateFr(DateTime d) => '${_deuxChiffres(d.day)}/${_deuxChiffres(d.month)}/${d.year}';
 
-  static String _2(int n) => n.toString().padLeft(2, '0');
+  static String _deuxChiffres(int n) => n.toString().padLeft(2, '0');
 }

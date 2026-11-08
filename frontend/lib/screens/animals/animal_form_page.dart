@@ -140,7 +140,7 @@ class _AnimalFormPageState extends State<AnimalFormPage> {
                 TextFormField(controller: _race, decoration: _deco('Race (optionnel)', champApi: 'race')),
                 espace,
                 DropdownButtonFormField<String>(
-                  value: _sexe,
+                  initialValue: _sexe,
                   decoration: _deco('Sexe *', champApi: 'sexe'),
                   items: [
                     for (final s in Animal.sexes.entries) DropdownMenuItem(value: s.key, child: Text(s.value)),
@@ -153,7 +153,7 @@ class _AnimalFormPageState extends State<AnimalFormPage> {
                   children: [
                     Expanded(
                       child: DropdownButtonFormField<int>(
-                        value: _moisNaissance,
+                        initialValue: _moisNaissance,
                         decoration: _deco('Mois de naissance'),
                         items: [
                           for (var m = 1; m <= 12; m++)
@@ -165,7 +165,7 @@ class _AnimalFormPageState extends State<AnimalFormPage> {
                     const SizedBox(width: 12),
                     Expanded(
                       child: DropdownButtonFormField<int>(
-                        value: _anneeNaissance,
+                        initialValue: _anneeNaissance,
                         decoration: _deco('Année', champApi: 'date_naissance'),
                         items: [
                           for (var y = anneeCourante; y >= anneeCourante - 30; y--)
