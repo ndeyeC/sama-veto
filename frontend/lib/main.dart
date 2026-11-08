@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'constants/app_colors.dart';
+import 'screens/animals/animals_page.dart';
 import 'screens/home_page.dart';
 
 void main() {
@@ -52,6 +53,7 @@ class SamaVetoApp extends StatelessWidget {
       ),
       home: const HomePage(),
       routes: {
+        '/animals': (context) => const AnimalsPage(),
         '/login': (context) => const AuthPlaceholderPage(
           title: 'Connexion',
           description:
