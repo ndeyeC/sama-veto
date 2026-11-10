@@ -3,8 +3,10 @@ class ApiConstants {
   static const String baseUrl = 'http://127.0.0.1:8000/api';
 
   // Routes API
+  static const String registerOptions = '/auth/options';
   static const String register = '/register';
   static const String login = '/login';
   static const String logout = '/logout';
   static const String profile = '/user';
+  static const String changePassword = '/user/password';
 }

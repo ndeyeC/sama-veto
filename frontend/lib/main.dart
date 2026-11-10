@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 
 import 'constants/app_colors.dart';
-import 'screens/home_page.dart';
+import 'screens/espace_page.dart';
+import 'screens/login_page.dart';
+import 'screens/register_page.dart';
+import 'screens/session_gate.dart';
 
 void main() {
   runApp(const SamaVetoApp());
@@ -50,18 +53,11 @@ class SamaVetoApp extends StatelessWidget {
           ),
         ),
       ),
-      home: const HomePage(),
+      home: const SessionGate(),
       routes: {
-        '/login': (context) => const AuthPlaceholderPage(
-          title: 'Connexion',
-          description:
-              'L’espace de connexion Sama Veto sera bientôt disponible.',
-        ),
-        '/register': (context) => const AuthPlaceholderPage(
-          title: 'Créer un compte',
-          description:
-              'La création de compte Sama Veto sera bientôt disponible.',
-        ),
+        '/login': (context) => const LoginPage(),
+        '/register': (context) => const RegisterPage(),
+        '/espace': (context) => const EspacePage(),
       },
     );
   }
